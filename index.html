@@ -1,1016 +1,579 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>リアルタイム地震・津波防災ダッシュボード</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet CSS & JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+JP:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Noto Sans JP', 'Inter', sans-serif; background-color: #0b0f19; color: #f3f4f6; }
-        #map { height: 100%; width: 100%; min-height: 400px; z-index: 1; background-color: #1a1d24; }
-        
-        .shindo-7 { background-color: #b91c1c; color: white; border: 2px solid #ef4444; }
-        .shindo-6upper { background-color: #991b1b; color: white; }
-        .shindo-6lower { background-color: #c2410c; color: white; }
-        .shindo-5upper { background-color: #ea580c; color: white; }
-        .shindo-5lower { background-color: #d97706; color: white; }
-        .shindo-4 { background-color: #ca8a04; color: white; }
-        .shindo-3 { background-color: #2563eb; color: white; }
-        .shindo-2 { background-color: #0284c7; color: white; }
-        .shindo-1 { background-color: #475569; color: white; }
-        .shindo-unknown { background-color: #374151; color: #9ca3af; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カウントダウンタイマー</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: [
+              'Hiragino Sans',
+              'Hiragino Kaku Gothic ProN',
+              'Yu Gothic UI',
+              'Meiryo',
+              'Noto Sans JP',
+              'Inter',
+              '-apple-system',
+              'sans-serif'
+            ],
+            mono: ['SF Mono', 'Roboto Mono', 'Consolas', 'monospace']
+          },
+          colors: {
+            warm: {
+              50: '#FDFBF7',
+              100: '#F7F4EE',
+              200: '#EFEAE1',
+              300: '#E0D7C8',
+              400: '#C7B9A3',
+              500: '#A8967E',
+              600: '#8A7761',
+              700: '#6C5C4A',
+              800: '#4F4235',
+              900: '#322A21',
+              950: '#1C1611'
+            },
+            accent: {
+              50: '#F0F7FF',
+              100: '#E0EFFE',
+              500: '#3B82F6',
+              600: '#2563EB',
+              700: '#1D4ED8'
+            }
+          },
+          boxShadow: {
+            'soft': '0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.025)',
+            'card': '0 2px 10px rgba(0, 0, 0, 0.03), 0 20px 25px -5px rgba(0, 0, 0, 0.05)',
+            'modal': '0 25px 50px -12px rgba(0, 0, 0, 0.15)'
+          }
+        }
+      }
+    }
+  </script>
 
-        .custom-pulse-marker { display: flex; align-items: center; justify-content: center; }
-        .pulse-ring {
-            position: absolute; border-radius: 50%; animation: pulse-ring 2s infinite ease-out; opacity: 0.8;
-        }
-        @keyframes pulse-ring {
-            0% { transform: scale(0.6); opacity: 0.9; }
-            100% { transform: scale(2.8); opacity: 0; }
-        }
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-        .my-location-cross-marker {
-            display: flex; align-items: center; justify-content: center;
-            width: 24px; height: 24px; background-color: #ef4444; color: #ffffff;
-            border: 2px solid #ffffff; border-radius: 50%; font-size: 14px; font-weight: 900;
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.8); z-index: 500;
-        }
-
-        .leaflet-popup-content-wrapper {
-            background-color: #1f2937; color: #f3f4f6; border-radius: 12px; border: 1px solid #374151;
-        }
-        .leaflet-popup-tip { background-color: #1f2937; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #111827; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
-    </style>
+  <style>
+    /* Smooth transition for theme toggle */
+    body {
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    
+    /* Subtle flip transition animation */
+    .time-num-card {
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+  </style>
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
+<body class="min-h-screen bg-warm-50 text-warm-900 dark:bg-slate-950 dark:text-slate-100 font-sans selection:bg-warm-200 dark:selection:bg-slate-800 flex flex-col justify-between antialiased">
 
-    <!-- ヘッダー -->
-    <header class="bg-gray-900 border-b border-gray-800 px-4 py-3 flex flex-wrap justify-between items-center z-20 gap-2">
-        <div class="flex items-center space-x-3">
-            <div class="bg-red-600 text-white p-2 rounded-lg flex items-center justify-center shadow-lg shadow-red-900/40">
-                <i class="fa-solid fa-house-chimney-crack text-xl"></i>
-            </div>
-            <div>
-                <h1 class="text-lg font-bold text-white leading-tight flex items-center gap-2">
-                    地震・津波リアルタイム防災情報
-                    <span class="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
-                </h1>
-                <p class="text-xs text-gray-400">気象庁 (JMA) &amp; 体感震度コミュニティ連携</p>
-            </div>
+  <!-- Header Bar -->
+  <header class="w-full border-b border-warm-200/60 dark:border-slate-800/80 bg-warm-50/80 dark:bg-slate-950/80 backdrop-blur-md sticky top-0 z-30 transition-colors">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      
+      <!-- Brand / Logo -->
+      <button onclick="openConfigModal()" class="flex items-center space-x-2.5 text-warm-800 dark:text-slate-200 hover:opacity-80 transition group text-left">
+        <div class="w-9 h-9 rounded-xl bg-warm-200/70 dark:bg-slate-800 flex items-center justify-center text-warm-700 dark:text-slate-300 group-hover:scale-105 transition-transform">
+          <i data-lucide="hourglass" class="w-5 h-5"></i>
         </div>
-
-        <div class="flex items-center space-x-4">
-            <div class="bg-gray-800 border border-gray-700 px-3 py-1.5 rounded-lg text-right shadow-inner">
-                <div id="jst-clock" class="text-base font-mono font-bold text-emerald-400">00:00:00 JST</div>
-                <div id="jst-date" class="text-xs text-gray-400">----/--/-- (--)</div>
-            </div>
-
-            <button id="audio-toggle-btn" onclick="toggleAudio()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition">
-                <i id="audio-icon" class="fa-solid fa-volume-xmark text-red-400"></i>
-                <span id="audio-text">警報音: OFF</span>
-            </button>
-
-            <button onclick="fetchData(true)" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition shadow-md">
-                <i id="refresh-icon" class="fa-solid fa-rotate"></i>
-                <span>更新</span>
-            </button>
+        <div>
+          <span class="font-bold text-base tracking-tight block">タイマー</span>
+          <span class="text-[10px] text-warm-500 dark:text-slate-400 block -mt-0.5">カウントダウン & 共有</span>
         </div>
-    </header>
+      </button>
 
-    <!-- 津波警報バナー -->
-    <div id="tsunami-alert-banner" class="hidden bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white font-bold px-4 py-2.5 flex items-center justify-between text-sm shadow-lg border-b border-red-500 animate-pulse z-20">
-        <div class="flex items-center gap-3">
-            <i class="fa-solid fa-triangle-exclamation text-xl"></i>
-            <span id="tsunami-banner-text">【津波警報発令】 沿岸部からただちに高台へ避難してください！</span>
-        </div>
-        <div class="flex items-center gap-2">
-            <button onclick="switchTab('tsunami')" class="bg-white text-red-700 px-3 py-1 rounded text-xs hover:bg-gray-100 transition font-extrabold">
-                詳細を確認
-            </button>
-            <button onclick="closeTsunamiBanner()" class="text-white hover:text-gray-200 p-1 px-2 rounded bg-black/20 hover:bg-black/40 transition">
-                <i class="fa-solid fa-xmark text-base"></i>
-            </button>
-        </div>
+      <!-- Action Tools -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- New / Edit Timer -->
+        <button onclick="openConfigModal()" class="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium bg-white dark:bg-slate-900 text-warm-800 dark:text-slate-200 rounded-xl border border-warm-200 dark:border-slate-800 shadow-sm hover:bg-warm-100/50 dark:hover:bg-slate-800 transition flex items-center space-x-1.5">
+          <i data-lucide="edit-3" class="w-4 h-4 text-warm-600 dark:text-slate-400"></i>
+          <span class="hidden sm:inline">タイマー編集</span>
+          <span class="sm:hidden">編集</span>
+        </button>
+
+        <!-- Share Button -->
+        <button onclick="openShareModal()" class="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium bg-warm-800 hover:bg-warm-900 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 rounded-xl shadow-sm transition flex items-center space-x-1.5">
+          <i data-lucide="share-2" class="w-4 h-4"></i>
+          <span>URL共有</span>
+        </button>
+
+        <!-- Dark / Light Mode Toggle -->
+        <button onclick="toggleDarkMode()" title="表示モード切替" class="p-2 text-warm-600 dark:text-slate-400 hover:bg-warm-200/50 dark:hover:bg-slate-800 rounded-xl transition">
+          <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+          <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+        </button>
+      </div>
     </div>
+  </header>
 
-    <!-- メインコンテンツ -->
-    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-
-        <!-- 左側サイドパネル -->
-        <div class="w-full md:w-96 bg-gray-900 border-r border-gray-800 flex flex-col h-1/2 md:h-full z-10 shadow-xl">
-            <!-- タブ切り替え -->
-            <div class="flex border-b border-gray-800 bg-gray-950 text-[11px] font-bold text-gray-400">
-                <button id="tab-btn-quake" onclick="switchTab('quake')" class="flex-1 py-3 px-1 text-blue-400 border-b-2 border-blue-500 flex items-center justify-center gap-1 transition bg-gray-900">
-                    <i class="fa-solid fa-rss"></i> 地震速報
-                </button>
-                <button id="tab-btn-community" onclick="switchTab('community')" class="flex-1 py-3 px-1 hover:text-white border-b-2 border-transparent flex items-center justify-center gap-1 transition">
-                    <i class="fa-solid fa-comments"></i> 体感コミュニティ
-                </button>
-                <button id="tab-btn-tsunami" onclick="switchTab('tsunami')" class="flex-1 py-3 px-1 hover:text-white border-b-2 border-transparent flex items-center justify-center gap-1 transition">
-                    <i class="fa-solid fa-water"></i> 津波
-                </button>
-                <button id="tab-btn-locations" onclick="switchTab('locations')" class="flex-1 py-3 px-1 hover:text-white border-b-2 border-transparent flex items-center justify-center gap-1 transition">
-                    <i class="fa-solid fa-location-dot"></i> 地点
-                </button>
-            </div>
-
-            <!-- 地震一覧タブ -->
-            <div id="tab-content-quake" class="flex-1 flex flex-col overflow-hidden">
-                <div class="p-3 bg-gray-900 border-b border-gray-800 flex gap-2">
-                    <select id="filter-shindo" onchange="applyFilters()" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 flex-1">
-                        <option value="all">すべての震度</option>
-                        <option value="4">震度4以上</option>
-                        <option value="5-">震度5弱以上</option>
-                        <option value="6-">震度6弱以上</option>
-                    </select>
-                    <select id="filter-source" onchange="applyFilters()" class="bg-gray-800 border border-gray-700 text-gray-200 text-xs rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 flex-1">
-                        <option value="jma">気象庁 (日本周辺)</option>
-                        <option value="usgs">USGS (世界規模)</option>
-                    </select>
-                </div>
-
-                <!-- 同期進捗プログレスバー -->
-                <div id="sync-progress-box" class="bg-gray-950 px-3 py-2 border-b border-gray-800 text-xs space-y-1">
-                    <div class="flex justify-between items-center text-gray-400">
-                        <span id="sync-status-text"><i class="fa-solid fa-rotate fa-spin text-blue-400"></i> 同期準備中...</span>
-                        <span id="sync-percent" class="font-mono font-bold text-blue-400">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                        <div id="sync-bar" class="bg-blue-500 h-1.5 transition-all duration-300 rounded-full" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <div id="earthquake-list" class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
-                    <div class="text-center text-gray-500 py-10">
-                        <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 text-blue-500"></i>
-                        <p class="text-xs">最新の地震データを同期中...</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 体感コミュニティタブ -->
-            <div id="tab-content-community" class="flex-1 overflow-y-auto p-4 custom-scrollbar hidden space-y-4">
-                <div class="bg-gray-800 p-3.5 rounded-xl border border-gray-700 shadow-md">
-                    <h3 class="text-xs font-bold text-gray-200 mb-2 flex items-center gap-2">
-                        <i class="fa-solid fa-bullhorn text-emerald-400"></i> 揺れの体感レポートを投稿
-                    </h3>
-                    <p class="text-[10px] text-gray-400 mb-3">登録地点から選択（12時間で自動消去）</p>
-                    <div class="space-y-2.5">
-                        <div>
-                            <label class="block text-[10px] text-gray-400 mb-1">投稿する地点:</label>
-                            <select id="comm-location-select" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none focus:border-emerald-500">
-                            </select>
-                        </div>
-                        <div class="flex gap-2">
-                            <select id="comm-shindo" class="w-1/2 bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none">
-                                <option value="無感">体感: 無感</option>
-                                <option value="1">震度 1</option>
-                                <option value="2">震度 2</option>
-                                <option value="3">震度 3</option>
-                                <option value="4">震度 4</option>
-                                <option value="5弱">震度 5弱</option>
-                                <option value="5強">震度 5強</option>
-                                <option value="6弱">震度 6弱</option>
-                                <option value="6強">震度 6強</option>
-                                <option value="7">震度 7</option>
-                            </select>
-                            <input id="comm-floor" type="number" min="1" max="100" placeholder="階数 (1〜100階)" class="w-1/2 bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none">
-                        </div>
-                        <input id="comm-comment" type="text" maxlength="15" placeholder="揺れの様子 (15文字以内)" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none focus:border-emerald-500">
-                        <button onclick="postCommunityReport()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 rounded font-bold transition shadow-md">
-                            匿名で投稿する
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="text-xs font-bold text-gray-400">みんなの体感レポート (直近12時間)</h4>
-                        <span id="comm-count" class="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full">0件</span>
-                    </div>
-                    <div id="community-posts-list" class="space-y-2.5"></div>
-                </div>
-            </div>
-
-            <!-- 津波情報タブ -->
-            <div id="tab-content-tsunami" class="flex-1 overflow-y-auto p-4 custom-scrollbar hidden space-y-3">
-                <div id="tsunami-status-container">
-                    <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
-                        <i class="fa-solid fa-shield-halved text-emerald-400 text-3xl mb-2"></i>
-                        <h3 class="text-sm font-bold text-gray-200">現在、津波警報・注意報はありません</h3>
-                        <p class="text-xs text-gray-400 mt-1">気象庁の最新データに津波警報等の発表はありません。</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 地点設定タブ（名前・県・市分離＋非表示設定対応） -->
-            <div id="tab-content-locations" class="flex-1 overflow-y-auto p-4 custom-scrollbar hidden space-y-4">
-                <div class="bg-gray-800 p-3.5 rounded-xl border border-gray-700 shadow-md space-y-2.5">
-                    <h3 class="text-xs font-bold text-gray-200 flex items-center gap-2">
-                        <i class="fa-solid fa-plus text-blue-400"></i> マイ地点を追加
-                    </h3>
-                    <div>
-                        <label class="block text-[10px] text-gray-400 mb-1">地点の名前（例: 自宅, 職場, 学校）:</label>
-                        <input id="loc-custom-name" type="text" placeholder="例: 自宅" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 focus:border-blue-500 outline-none">
-                    </div>
-                    <div class="flex gap-2">
-                        <div class="w-1/2">
-                            <label class="block text-[10px] text-gray-400 mb-1">県・地域:</label>
-                            <input id="loc-pref" type="text" placeholder="例: 大阪府" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none">
-                        </div>
-                        <div class="w-1/2">
-                            <label class="block text-[10px] text-gray-400 mb-1">市・区:</label>
-                            <input id="loc-city" type="text" placeholder="例: 大阪市北区" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none">
-                        </div>
-                    </div>
-                    <!-- 市の非表示チェックボックス -->
-                    <div class="flex items-center gap-2 pt-1">
-                        <input id="loc-hide-city" type="checkbox" class="rounded bg-gray-900 border-gray-700 text-blue-600 focus:ring-blue-500">
-                        <label for="loc-hide-city" class="text-[11px] text-gray-300 cursor-pointer">市（または区）を非表示にする（名前と県のみ表示）</label>
-                    </div>
-
-                    <div class="flex gap-2 pt-1">
-                        <input id="loc-lat" type="number" step="any" placeholder="緯度" class="w-1/2 bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none">
-                        <input id="loc-lng" type="number" step="any" placeholder="経度" class="w-1/2 bg-gray-900 border border-gray-700 rounded p-2 text-xs text-gray-200 outline-none">
-                    </div>
-                    <div class="flex gap-2 pt-1">
-                        <button onclick="getCurrentGPSLocation()" class="bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs py-1.5 px-3 rounded flex-1 flex items-center justify-center gap-1 transition">
-                            <i class="fa-solid fa-location-arrow text-blue-400"></i> GPS取得
-                        </button>
-                        <button onclick="addSavedLocation()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs py-1.5 px-4 rounded font-semibold transition">
-                            保存
-                        </button>
-                    </div>
-                </div>
-
-                <div>
-                    <h4 class="text-xs font-bold text-gray-400 mb-2">登録済み地点一覧</h4>
-                    <div id="saved-locations-list" class="space-y-2"></div>
-                </div>
-            </div>
+  <!-- Main Countdown View -->
+  <main class="flex-grow flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div id="mainContainer" class="w-full max-w-4xl mx-auto flex flex-col items-center justify-center py-8 sm:py-16">
+      
+      <!-- Event Header / Title -->
+      <div class="text-center mb-10 sm:mb-14 max-w-2xl px-4">
+        <!-- Target Date Sub-badge -->
+        <div id="targetBadge" class="inline-flex items-center px-3.5 py-1 rounded-full text-xs sm:text-sm font-medium bg-warm-200/50 dark:bg-slate-800/60 text-warm-700 dark:text-slate-300 border border-warm-300/40 dark:border-slate-700/50 mb-4">
+          <i data-lucide="calendar" class="w-3.5 h-3.5 mr-2 text-warm-500 dark:text-slate-400"></i>
+          <span id="displayTargetDate">--年--月--日 --:--</span>
         </div>
 
-        <!-- 右側マップ -->
-        <div class="flex-1 relative h-1/2 md:h-full">
-            <div id="map"></div>
+        <!-- Main Display Title -->
+        <h1 id="displayTitle" class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-warm-900 dark:text-white leading-tight break-words">
+          <!-- Dynamically populated -->
+        </h1>
+      </div>
 
-            <div class="absolute bottom-4 left-4 z-[500] bg-gray-900/90 backdrop-blur-md border border-gray-700 p-3 rounded-xl text-xs space-y-2 hidden sm:block max-w-xs shadow-2xl">
-                <div class="font-bold text-gray-200 flex items-center justify-between">
-                    <span><i class="fa-solid fa-map-location-dot text-blue-400"></i> インタラクティブマップ</span>
-                </div>
-                <p class="text-gray-300 text-[11px] leading-relaxed">
-                    <span class="text-red-400 font-bold">赤＋マーク</span>は登録マイ地点です。震源地ピンをクリックで深さ・距離を表示します。
-                </p>
-                <div class="grid grid-cols-4 gap-1 text-[10px] font-bold text-center pt-1 border-t border-gray-800">
-                    <span class="shindo-7 rounded py-0.5">震度7</span>
-                    <span class="shindo-6upper rounded py-0.5">震度6強/弱</span>
-                    <span class="shindo-5upper rounded py-0.5">震度5強/弱</span>
-                    <span class="shindo-4 rounded py-0.5">震度4以下</span>
-                </div>
-            </div>
+      <!-- Main Number Cards (Grid) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 lg:gap-8 w-full max-w-3xl px-2">
+        
+        <!-- Days Card -->
+        <div class="bg-white dark:bg-slate-900/90 border border-warm-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-center shadow-card transition-all duration-300 flex flex-col justify-center items-center">
+          <span id="daysVal" class="text-4xl sm:text-6xl lg:text-7xl font-bold font-mono tracking-tight text-warm-900 dark:text-slate-50">00</span>
+          <span class="mt-2 text-xs sm:text-sm font-medium text-warm-500 dark:text-slate-400">日</span>
         </div>
+
+        <!-- Hours Card -->
+        <div class="bg-white dark:bg-slate-900/90 border border-warm-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-center shadow-card transition-all duration-300 flex flex-col justify-center items-center">
+          <span id="hoursVal" class="text-4xl sm:text-6xl lg:text-7xl font-bold font-mono tracking-tight text-warm-900 dark:text-slate-50">00</span>
+          <span class="mt-2 text-xs sm:text-sm font-medium text-warm-500 dark:text-slate-400">時間</span>
+        </div>
+
+        <!-- Minutes Card -->
+        <div class="bg-white dark:bg-slate-900/90 border border-warm-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-center shadow-card transition-all duration-300 flex flex-col justify-center items-center">
+          <span id="minsVal" class="text-4xl sm:text-6xl lg:text-7xl font-bold font-mono tracking-tight text-warm-900 dark:text-slate-50">00</span>
+          <span class="mt-2 text-xs sm:text-sm font-medium text-warm-500 dark:text-slate-400">分</span>
+        </div>
+
+        <!-- Seconds Card -->
+        <div class="bg-white dark:bg-slate-900/90 border border-warm-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-center shadow-card transition-all duration-300 flex flex-col justify-center items-center">
+          <span id="secsVal" class="text-4xl sm:text-6xl lg:text-7xl font-bold font-mono tracking-tight text-warm-900 dark:text-slate-50">00</span>
+          <span class="mt-2 text-xs sm:text-sm font-medium text-warm-500 dark:text-slate-400">秒</span>
+        </div>
+
+      </div>
+
+      <!-- Time Up Message Banner (Hidden by default) -->
+      <div id="timeUpBanner" class="hidden mt-10 p-6 sm:p-8 rounded-3xl bg-warm-200/60 dark:bg-slate-900 border border-warm-300/60 dark:border-slate-800 text-center max-w-lg w-full shadow-soft transition-all">
+        <div class="w-12 h-12 bg-warm-800 dark:bg-slate-100 text-white dark:text-slate-900 rounded-full flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="check" class="w-6 h-6"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-warm-900 dark:text-white">時間になりました！</h2>
+        <p class="text-sm text-warm-600 dark:text-slate-400 mt-1">設定された目標日時に到達しました。</p>
+      </div>
+
+      <!-- Quick Action Options -->
+      <div class="mt-12 flex flex-wrap justify-center gap-3">
+        <button onclick="openConfigModal()" class="px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-warm-100/60 dark:hover:bg-slate-800 border border-warm-200 dark:border-slate-800 text-sm font-medium text-warm-800 dark:text-slate-200 shadow-sm transition flex items-center space-x-2">
+          <i data-lucide="sliders" class="w-4 h-4 text-warm-600 dark:text-slate-400"></i>
+          <span>設定を変更</span>
+        </button>
+        <button onclick="openShareModal()" class="px-5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-warm-100/60 dark:hover:bg-slate-800 border border-warm-200 dark:border-slate-800 text-sm font-medium text-warm-800 dark:text-slate-200 shadow-sm transition flex items-center space-x-2">
+          <i data-lucide="link" class="w-4 h-4 text-warm-600 dark:text-slate-400"></i>
+          <span>URLを共有</span>
+        </button>
+      </div>
+
     </div>
+  </main>
 
-    <!-- モーダル詳細画面 -->
-    <div id="quake-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-            <div class="p-4 bg-gray-800 border-b border-gray-700 flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <span id="modal-shindo-badge" class="px-2.5 py-1 rounded text-xs font-bold">震度-</span>
-                    <h3 id="modal-title" class="font-bold text-white text-base">震源地情報</h3>
-                </div>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-white p-1">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-            <div class="p-4 overflow-y-auto space-y-4 text-xs text-gray-300 custom-scrollbar">
-                <div class="grid grid-cols-2 gap-3 bg-gray-950 p-3 rounded-xl border border-gray-800">
-                    <div><span class="text-gray-500">発生時刻:</span> <span id="modal-time" class="text-gray-200 font-semibold block text-sm">--:--</span></div>
-                    <div><span class="text-gray-500">マグニチュード:</span> <span id="modal-mag" class="text-gray-200 font-semibold block text-sm">M--</span></div>
-                    <div><span class="text-gray-500">震源の深さ:</span> <span id="modal-depth" class="text-blue-400 font-bold block text-sm">--km</span></div>
-                    <div><span class="text-gray-500">津波の影響:</span> <span id="modal-tsunami-text" class="text-gray-200 font-semibold block text-sm">--</span></div>
-                </div>
-
-                <div id="modal-distance-section" class="bg-blue-950/40 border border-blue-800/50 p-3 rounded-xl">
-                    <h4 class="font-bold text-blue-300 mb-1 flex items-center gap-1">
-                        <i class="fa-solid fa-compass text-blue-400"></i> 設定地点からの距離
-                    </h4>
-                    <div id="modal-distance-list" class="space-y-1 text-gray-300"></div>
-                </div>
-            </div>
+  <!-- Timer Setup / Edit Modal Dialog -->
+  <div id="configModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-warm-950/30 dark:bg-slate-950/70 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white dark:bg-slate-900 border border-warm-200/80 dark:border-slate-800 rounded-3xl w-full max-w-lg p-6 sm:p-8 shadow-modal transform scale-95 transition-all duration-300">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-warm-100 dark:border-slate-800 pb-4 mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-warm-900 dark:text-white">タイマー設定</h2>
+          <p class="text-xs text-warm-500 dark:text-slate-400 mt-0.5">カウントダウンする目標と日時を入力してください</p>
         </div>
+        <button onclick="closeConfigModal()" class="p-2 text-warm-400 hover:text-warm-700 dark:text-slate-500 dark:hover:text-slate-200 rounded-xl hover:bg-warm-100 dark:hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Form -->
+      <form id="timerForm" onsubmit="handleFormSubmit(event)" class="space-y-6">
+        
+        <!-- Title Input -->
+        <div>
+          <label class="block text-sm font-semibold text-warm-800 dark:text-slate-200 mb-2">タイトル / イベント名</label>
+          <input type="text" id="inputTitle" placeholder="タイトルを入力 (例: 試験, 発表会)" class="w-full px-4 py-3 rounded-2xl bg-warm-50/50 dark:bg-slate-800/50 border border-warm-200 dark:border-slate-700 text-warm-900 dark:text-slate-100 placeholder-warm-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-warm-400 dark:focus:ring-slate-600 transition">
+          <p class="text-[11px] text-warm-500 dark:text-slate-400 mt-1.5">※ 末尾に「まで」が付いていない場合は自動的に追加されます（例: 「試験」→「試験まで」）</p>
+        </div>
+
+        <!-- Target Date & Time -->
+        <div>
+          <label class="block text-sm font-semibold text-warm-800 dark:text-slate-200 mb-2">目標日時</label>
+          <input type="datetime-local" id="inputDateTime" required class="w-full px-4 py-3 rounded-2xl bg-warm-50/50 dark:bg-slate-800/50 border border-warm-200 dark:border-slate-700 text-warm-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-warm-400 dark:focus:ring-slate-600 transition">
+        </div>
+
+        <!-- Quick Presets -->
+        <div>
+          <span class="block text-xs font-semibold text-warm-500 dark:text-slate-400 uppercase tracking-wider mb-2">クイック追加</span>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" onclick="addPresetTime(10, 'minutes')" class="py-2 px-3 text-xs font-medium bg-warm-100/70 hover:bg-warm-200/70 dark:bg-slate-800 dark:hover:bg-slate-700 text-warm-800 dark:text-slate-200 rounded-xl transition">+10分</button>
+            <button type="button" onclick="addPresetTime(1, 'hours')" class="py-2 px-3 text-xs font-medium bg-warm-100/70 hover:bg-warm-200/70 dark:bg-slate-800 dark:hover:bg-slate-700 text-warm-800 dark:text-slate-200 rounded-xl transition">+1時間</button>
+            <button type="button" onclick="addPresetTime(1, 'days')" class="py-2 px-3 text-xs font-medium bg-warm-100/70 hover:bg-warm-200/70 dark:bg-slate-800 dark:hover:bg-slate-700 text-warm-800 dark:text-slate-200 rounded-xl transition">+1日</button>
+            <button type="button" onclick="addPresetTime(7, 'days')" class="py-2 px-3 text-xs font-medium bg-warm-100/70 hover:bg-warm-200/70 dark:bg-slate-800 dark:hover:bg-slate-700 text-warm-800 dark:text-slate-200 rounded-xl transition">+1週間</button>
+          </div>
+        </div>
+
+        <!-- Audio Toggle Option -->
+        <div class="flex items-center justify-between border-t border-warm-100 dark:border-slate-800 pt-4">
+          <div>
+            <span class="text-sm font-semibold text-warm-800 dark:text-slate-200 block">到達時の通知音</span>
+            <span class="text-xs text-warm-500 dark:text-slate-400 block">カウント終了時にやさしい通知音を再生</span>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="audioToggle" class="sr-only peer" checked>
+            <div class="w-11 h-6 bg-warm-200 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-warm-800 dark:peer-checked:bg-slate-200"></div>
+          </label>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="pt-2">
+          <button type="submit" class="w-full py-3.5 px-6 rounded-2xl bg-warm-900 hover:bg-warm-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-bold text-sm shadow-soft transition">
+            タイマーを開始
+          </button>
+        </div>
+
+      </form>
     </div>
+  </div>
 
-    <!-- スクリプト -->
-    <script>
-        let map;
-        let quakeMarkersGroup;
-        let locationMarkersGroup;
-        let earthquakesData = [];
-        let audioEnabled = false;
-        let audioCtx = null;
-        let bannerDismissed = false;
+  <!-- Share URL Modal Dialog -->
+  <div id="shareModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-warm-950/30 dark:bg-slate-950/70 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white dark:bg-slate-900 border border-warm-200/80 dark:border-slate-800 rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-modal transform scale-95 transition-all duration-300">
+      
+      <div class="flex items-center justify-between border-b border-warm-100 dark:border-slate-800 pb-4 mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-warm-900 dark:text-white">URLを共有</h2>
+          <p class="text-xs text-warm-500 dark:text-slate-400 mt-0.5">設定したカウントダウンを他の人に送ることができます</p>
+        </div>
+        <button onclick="closeShareModal()" class="p-2 text-warm-400 hover:text-warm-700 dark:text-slate-500 dark:hover:text-slate-200 rounded-xl hover:bg-warm-100 dark:hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
 
-        // デフォルト初期値（名称、県、市、市非表示フラグ、緯度、経度）
-        let savedLocations = JSON.parse(localStorage.getItem('saved_locations') || '[{"customName":"自宅","pref":"大阪府","city":"大阪市北区","hideCity":false,"lat":34.7024,"lng":135.4959}]');
-        let communityPosts = JSON.parse(localStorage.getItem('community_posts') || '[]');
+      <!-- Copy Box -->
+      <div class="space-y-4">
+        <div class="flex items-center space-x-2">
+          <input type="text" id="shareUrlInput" readonly class="w-full px-4 py-3 rounded-2xl bg-warm-50/50 dark:bg-slate-800/50 border border-warm-200 dark:border-slate-700 text-warm-800 dark:text-slate-200 text-xs font-mono focus:outline-none select-all">
+          <button onclick="copyShareUrl()" id="copyBtn" class="px-5 py-3 rounded-2xl bg-warm-900 hover:bg-warm-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-bold text-xs transition flex items-center space-x-1.5 whitespace-nowrap shadow-sm">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            <span id="copyBtnText">URLをコピー</span>
+          </button>
+        </div>
 
-        const tileLayers = {
-            '国土地理院 (標準地図)': L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-                maxZoom: 18,
-                attribution: '&copy; 国土地理院'
-            }),
-            '国土地理院 (淡色地図)': L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
-                maxZoom: 18,
-                attribution: '&copy; 国土地理院'
-            }),
-            'CartoDB Voyager': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                maxZoom: 19,
-                subdomains: 'abcd',
-                attribution: '&copy; CARTO'
-            }),
-            'Esri 衛星写真': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri'
-            })
-        };
+        <div class="p-3.5 rounded-2xl bg-warm-100/50 dark:bg-slate-800/40 border border-warm-200/50 dark:border-slate-800 flex items-start space-x-2.5">
+          <i data-lucide="info" class="w-4 h-4 text-warm-500 dark:text-slate-400 mt-0.5 flex-shrink-0"></i>
+          <p class="text-xs text-warm-600 dark:text-slate-400 leading-relaxed">
+            このリンクを開いた人は、同じタイトルと目標日時でカウントダウンタイマーを閲覧できます。
+          </p>
+        </div>
+      </div>
 
-        window.addEventListener('DOMContentLoaded', () => {
-            initClock();
-            initMap();
-            renderSavedLocations();
-            updateCommunityLocationDropdown();
-            cleanAndRenderCommunityPosts();
-            fetchData();
-            setInterval(fetchData, 60000);
-            setInterval(cleanAndRenderCommunityPosts, 30000);
-        });
+    </div>
+  </div>
 
-        function initClock() {
-            function updateClock() {
-                const now = new Date();
-                document.getElementById('jst-clock').innerText = `${now.toLocaleTimeString('ja-JP', { hour12: false })} JST`;
-                document.getElementById('jst-date').innerText = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
+  <!-- Footer -->
+  <footer class="w-full border-t border-warm-200/50 dark:border-slate-800/60 py-6 text-center text-xs text-warm-500 dark:text-slate-500">
+    <p>カウントダウンタイマー &copy; 2026</p>
+  </footer>
+
+  <!-- Main JavaScript Logic -->
+  <script>
+    // Global Application State
+    let timerState = {
+      title: "",
+      targetIso: "",
+      audioAlert: true
+    };
+
+    let timerInterval = null;
+    let audioContext = null;
+
+    // Helper: Normalize title so it ALWAYS ends with "まで"
+    function formatTitle(rawTitle) {
+      if (!rawTitle || rawTitle.trim() === "") {
+        return "目標日時まで";
+      }
+      const trimmed = rawTitle.trim();
+      return trimmed.endsWith("まで") ? trimmed : `${trimmed}まで`;
+    }
+
+    // App Startup
+    window.onload = function() {
+      lucide.createIcons();
+      
+      const hasUrlParams = parseUrlParams();
+
+      if (!hasUrlParams) {
+        // First visit with no shared URL params -> Open setup dialog directly
+        setDefaultTargetDate();
+        document.getElementById('inputTitle').value = ""; // Empty title default
+        openConfigModal();
+      } else {
+        syncStateToUI();
+        startCountdown();
+      }
+    };
+
+    // Parse URL Hash Parameters (#title=...&target=...)
+    function parseUrlParams() {
+      const hash = window.location.hash.substring(1);
+      if (!hash) return false;
+
+      const params = new URLSearchParams(hash);
+      const titleParam = params.get('title');
+      const targetParam = params.get('target');
+
+      if (!targetParam) return false;
+
+      if (titleParam) {
+        timerState.title = formatTitle(decodeURIComponent(titleParam));
+      } else {
+        timerState.title = "目標日時まで";
+      }
+
+      const targetDate = new Date(isNaN(targetParam) ? targetParam : parseInt(targetParam));
+      if (isNaN(targetDate.getTime())) return false;
+
+      timerState.targetIso = targetDate.toISOString();
+      return true;
+    }
+
+    // Default target date: 24 hours from now
+    function setDefaultTargetDate() {
+      const future = new Date();
+      future.setHours(future.getHours() + 24);
+      timerState.targetIso = future.toISOString();
+    }
+
+    // Sync State to UI Components
+    function syncStateToUI() {
+      const currentTitle = formatTitle(timerState.title);
+      timerState.title = currentTitle;
+
+      // Update Page Display Title
+      document.getElementById('displayTitle').innerText = currentTitle;
+
+      // Format Date String (Japanese format)
+      const targetDate = new Date(timerState.targetIso);
+      const year = targetDate.getFullYear();
+      const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const day = String(targetDate.getDate()).padStart(2, '0');
+      const hours = String(targetDate.getHours()).padStart(2, '0');
+      const minutes = String(targetDate.getMinutes()).padStart(2, '0');
+
+      document.getElementById('displayTargetDate').innerText = `${year}年${month}月${day}日 ${hours}:${minutes}`;
+
+      // Sync Input Fields
+      const inputTitleEl = document.getElementById('inputTitle');
+      if (timerState.title && timerState.title !== "目標日時まで") {
+        inputTitleEl.value = timerState.title.replace(/まで$/, '');
+      }
+
+      // Format datetime-local
+      const localIso = new Date(targetDate.getTime() - targetDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      document.getElementById('inputDateTime').value = localIso;
+    }
+
+    // Start Countdown Loop
+    function startCountdown() {
+      if (timerInterval) clearInterval(timerInterval);
+
+      function update() {
+        const now = new Date().getTime();
+        const target = new Date(timerState.targetIso).getTime();
+        const diff = target - now;
+
+        const timeUpBanner = document.getElementById('timeUpBanner');
+
+        if (diff <= 0) {
+          document.getElementById('daysVal').innerText = "00";
+          document.getElementById('hoursVal').innerText = "00";
+          document.getElementById('minsVal').innerText = "00";
+          document.getElementById('secsVal').innerText = "00";
+
+          document.title = `【完了】${timerState.title}`;
+
+          if (timeUpBanner.classList.contains('hidden')) {
+            timeUpBanner.classList.remove('hidden');
+            if (timerState.audioAlert) {
+              playChimeSound();
             }
-            updateClock();
-            setInterval(updateClock, 1000);
+          }
+          return;
+        } else {
+          timeUpBanner.classList.add('hidden');
         }
 
-        function initMap() {
-            map = L.map('map', {
-                center: [36.578056, 136.648056],
-                zoom: 5,
-                layers: [tileLayers['国土地理院 (標準地図)']]
-            });
+        // Calculate time units
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
 
-            L.control.layers(tileLayers).addTo(map);
-            quakeMarkersGroup = L.layerGroup().addTo(map);
-            locationMarkersGroup = L.layerGroup().addTo(map);
+        document.getElementById('daysVal').innerText = String(days).padStart(2, '0');
+        document.getElementById('hoursVal').innerText = String(hours).padStart(2, '0');
+        document.getElementById('minsVal').innerText = String(mins).padStart(2, '0');
+        document.getElementById('secsVal').innerText = String(secs).padStart(2, '0');
 
-            updateSavedLocationMarkers();
-            setTimeout(() => { map.invalidateSize(); }, 300);
+        // Dynamic Browser Tab Title Update
+        document.title = `${days}日 ${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} - ${timerState.title}`;
+      }
+
+      update();
+      timerInterval = setInterval(update, 1000);
+    }
+
+    // Preset Time Addition Helpers
+    function addPresetTime(amount, unit) {
+      const dtInput = document.getElementById('inputDateTime');
+      let baseDate = dtInput.value ? new Date(dtInput.value) : new Date();
+      if (isNaN(baseDate.getTime())) baseDate = new Date();
+
+      if (unit === 'minutes') {
+        baseDate.setMinutes(baseDate.getMinutes() + amount);
+      } else if (unit === 'hours') {
+        baseDate.setHours(baseDate.getHours() + amount);
+      } else if (unit === 'days') {
+        baseDate.setDate(baseDate.getDate() + amount);
+      }
+
+      const localIso = new Date(baseDate.getTime() - baseDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      dtInput.value = localIso;
+    }
+
+    // Form Submission Handler
+    function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const rawTitle = document.getElementById('inputTitle').value;
+      const dateTimeVal = document.getElementById('inputDateTime').value;
+      const audioVal = document.getElementById('audioToggle').checked;
+
+      if (!dateTimeVal) return;
+
+      const targetDate = new Date(dateTimeVal);
+
+      timerState.title = formatTitle(rawTitle);
+      timerState.targetIso = targetDate.toISOString();
+      timerState.audioAlert = audioVal;
+
+      updateUrlHash();
+      syncStateToUI();
+      startCountdown();
+      closeConfigModal();
+    }
+
+    // Update URL Hash (#title=...&target=...)
+    function updateUrlHash() {
+      const params = new URLSearchParams();
+      params.set('title', encodeURIComponent(timerState.title));
+      params.set('target', new Date(timerState.targetIso).getTime());
+
+      window.history.replaceState(null, '', '#' + params.toString());
+    }
+
+    // Modal Control Functions
+    function openConfigModal() {
+      const modal = document.getElementById('configModal');
+      const container = modal.firstElementChild;
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      container.classList.remove('scale-95');
+      container.classList.add('scale-100');
+    }
+
+    function closeConfigModal() {
+      const modal = document.getElementById('configModal');
+      const container = modal.firstElementChild;
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      container.classList.remove('scale-100');
+      container.classList.add('scale-95');
+    }
+
+    function openShareModal() {
+      updateUrlHash();
+      const shareUrlInput = document.getElementById('shareUrlInput');
+      shareUrlInput.value = window.location.href;
+
+      const modal = document.getElementById('shareModal');
+      const container = modal.firstElementChild;
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      container.classList.remove('scale-95');
+      container.classList.add('scale-100');
+    }
+
+    function closeShareModal() {
+      const modal = document.getElementById('shareModal');
+      const container = modal.firstElementChild;
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      container.classList.remove('scale-100');
+      container.classList.add('scale-95');
+    }
+
+    // Copy URL to Clipboard
+    function copyShareUrl() {
+      const shareUrlInput = document.getElementById('shareUrlInput');
+      shareUrlInput.select();
+
+      try {
+        document.execCommand('copy');
+        const btnText = document.getElementById('copyBtnText');
+        btnText.innerText = 'コピーしました！';
+        setTimeout(() => {
+          btnText.innerText = 'URLをコピー';
+        }, 2000);
+      } catch (err) {
+        console.error('Copy failed: ', err);
+      }
+    }
+
+    // Dark Mode Toggle
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      html.classList.toggle('dark');
+    }
+
+    // Play Gentle Audio Chime when timer reaches zero
+    function playChimeSound() {
+      try {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
 
-        // 地点オブジェクトから表示用文字列を生成するヘルパー
-        function formatLocationDisplay(loc) {
-            let parts = [loc.customName, loc.pref];
-            if (!loc.hideCity && loc.city) {
-                parts.push(loc.city);
-            }
-            return parts.filter(Boolean).join(' ');
-        }
-
-        async function fetchWithProxy(url) {
-            try {
-                const res = await fetch(url);
-                if (res.ok) return await res.json();
-            } catch (e) {}
-
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-            const proxyRes = await fetch(proxyUrl);
-            const proxyData = await proxyRes.json();
-            return JSON.parse(proxyData.contents);
-        }
-
-        function updateSyncProgress(percent, message) {
-            const bar = document.getElementById('sync-bar');
-            const percentText = document.getElementById('sync-percent');
-            const statusText = document.getElementById('sync-status-text');
-            
-            if (bar) bar.style.width = `${percent}%`;
-            if (percentText) percentText.innerText = `${percent}%`;
-            if (statusText) statusText.innerHTML = `<i class="fa-solid fa-rotate fa-spin text-blue-400"></i> ${message}`;
-        }
-
-        async function fetchData(isManual = false) {
-            const refreshIcon = document.getElementById('refresh-icon');
-            if (refreshIcon) refreshIcon.classList.add('fa-spin');
-
-            try {
-                updateSyncProgress(20, '気象庁サーバーに接続中...');
-                const source = document.getElementById('filter-source').value;
-                
-                if (source === 'jma') {
-                    await fetchJMAData();
-                } else {
-                    await fetchUSGSData();
-                }
-
-                updateSyncProgress(80, '津波情報を確認中...');
-                await fetchTSUNAMIData();
-
-                updateSyncProgress(100, 'データの同期が完了しました');
-                setTimeout(() => {
-                    const box = document.getElementById('sync-progress-box');
-                    if (box) box.style.opacity = '0.7';
-                }, 1200);
-
-            } catch (err) {
-                console.error('データ取得エラー:', err);
-                updateSyncProgress(100, '同期失敗：サーバー接続を確認してください');
-            } finally {
-                if (refreshIcon) refreshIcon.classList.remove('fa-spin');
-            }
-        }
-
-        function parseJMACod(codStr) {
-            if (!codStr) return { lat: null, lng: null, depth: '不明' };
-            const match = codStr.match(/([\+\-][0-9\.]+)([\+\-][0-9\.]+)([\+\-][0-9\.]+)?/);
-            if (!match) return { lat: null, lng: null, depth: '不明' };
-
-            function convertToDegree(str) {
-                const num = parseFloat(str);
-                const absNum = Math.abs(num);
-                const sign = num < 0 ? -1 : 1;
-                if (absNum >= 1000) {
-                    const deg = Math.floor(absNum / 100);
-                    const min = absNum % 100;
-                    return sign * (deg + min / 60);
-                }
-                return num;
-            }
-
-            let depthStr = '不明';
-            if (match[3]) {
-                const depthMeters = Math.abs(parseFloat(match[3]));
-                if (!isNaN(depthMeters)) {
-                    if (depthMeters === 0) depthStr = 'ごく浅い';
-                    else depthStr = `約${Math.round(depthMeters / 1000)}km`;
-                }
-            }
-
-            return {
-                lat: convertToDegree(match[1]),
-                lng: convertToDegree(match[2]),
-                depth: depthStr
-            };
-        }
-
-        function parseJMAShindo(maxi) {
-            if (!maxi) return '情報なし';
-            const map = {
-                '10': '1', '1': '1',
-                '20': '2', '2': '2',
-                '30': '3', '3': '3',
-                '40': '4', '4': '4',
-                '45': '5弱', '5-': '5弱',
-                '50': '5強', '5+': '5強',
-                '55': '6弱', '6-': '6弱',
-                '60': '6強', '6+': '6強',
-                '70': '7',   '7': '7'
-            };
-            return map[String(maxi).trim()] || String(maxi);
-        }
-
-        async function fetchJMAData() {
-            updateSyncProgress(40, '気象庁JMA地震リストを取得中...');
-            const list = await fetchWithProxy('https://www.jma.go.jp/bosai/quake/data/list.json');
-            
-            updateSyncProgress(60, '取得データを解析・構造化中...');
-            earthquakesData = list.map(item => {
-                const maxInt = parseJMAShindo(item.maxi);
-                const parsedCod = parseJMACod(item.cod);
-                
-                let depth = item.dep || parsedCod.depth;
-                if (depth && !depth.includes('km') && !isNaN(parseFloat(depth))) {
-                    depth = `${depth}km`;
-                }
-
-                return {
-                    id: item.eid || item.ctt,
-                    place: item.anm || '震源地不明・調査中',
-                    lat: parsedCod.lat,
-                    lng: parsedCod.lng,
-                    depth: depth || '不明',
-                    mag: item.mag ? `M${item.mag}` : '不明',
-                    shindo: maxInt,
-                    time: formatJMADate(item.at || item.ctt),
-                    tsunamiText: item.tsunami || 'なし'
-                };
-            }).filter(q => q.lat !== null && q.lng !== null).slice(0, 30);
-
-            updateSyncProgress(90, 'マップマーカーとリストを描画中...');
-            renderEarthquakeList();
-            updateMapMarkers();
-        }
-
-        async function fetchUSGSData() {
-            updateSyncProgress(50, 'USGSワールドフィードを取得中...');
-            const data = await fetchWithProxy('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson');
-
-            earthquakesData = data.features.map(f => {
-                const mag = f.properties.mag;
-                let estimatedShindo = "1";
-                if (mag >= 7.0) estimatedShindo = "6強";
-                else if (mag >= 6.0) estimatedShindo = "5強";
-                else if (mag >= 5.0) estimatedShindo = "4";
-                else if (mag >= 4.5) estimatedShindo = "3";
-
-                return {
-                    id: f.id,
-                    place: f.properties.place,
-                    lat: f.geometry.coordinates[1],
-                    lng: f.geometry.coordinates[0],
-                    depth: `${Math.round(f.geometry.coordinates[2])}km`,
-                    mag: `M${mag.toFixed(1)}`,
-                    shindo: estimatedShindo,
-                    time: new Date(f.properties.time).toLocaleString('ja-JP'),
-                    tsunamiText: f.properties.tsunami ? '津波の可能性あり' : 'なし'
-                };
-            });
-
-            updateSyncProgress(90, 'マップマーカーを描画中...');
-            renderEarthquakeList();
-            updateMapMarkers();
-        }
-
-        async function fetchTSUNAMIData() {
-            try {
-                const data = await fetchWithProxy('https://www.jma.go.jp/bosai/tsunami/data/list.json');
-                const tsunamiContainer = document.getElementById('tsunami-status-container');
-                const banner = document.getElementById('tsunami-alert-banner');
-
-                const severeAlerts = data.filter(item => {
-                    const text = (item.ttl || '') + (item.headline || '');
-                    return text.includes('警報') || text.includes('注意報');
-                });
-
-                if (severeAlerts.length > 0) {
-                    if (!bannerDismissed) banner.classList.remove('hidden');
-                    playAlertTone(880, 0.5);
-
-                    tsunamiContainer.innerHTML = severeAlerts.map(alert => `
-                        <div class="bg-red-950/60 border border-red-600 rounded-xl p-3.5 space-y-2">
-                            <div class="flex items-center gap-2 text-red-400 font-bold text-sm">
-                                <i class="fa-solid fa-triangle-exclamation"></i> ${alert.ttl || '津波警報・注意報'}
-                            </div>
-                            <p class="text-xs text-gray-200">${alert.headline || '沿岸部・河口付近からただちに離れてください。'}</p>
-                        </div>
-                    `).join('');
-                } else {
-                    banner.classList.add('hidden');
-                    tsunamiContainer.innerHTML = `
-                        <div class="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
-                            <i class="fa-solid fa-shield-halved text-emerald-400 text-3xl mb-2"></i>
-                            <h3 class="text-sm font-bold text-gray-200">現在、津波警報・注意報はありません</h3>
-                            <p class="text-xs text-gray-400 mt-1">気象庁の最新データに津波警報等の発表はありません。</p>
-                        </div>
-                    `;
-                }
-            } catch (e) {}
-        }
-
-        function closeTsunamiBanner() {
-            document.getElementById('tsunami-alert-banner').classList.add('hidden');
-            bannerDismissed = true;
-        }
-
-        // --- コミュニティ機能 ---
-        function updateCommunityLocationDropdown() {
-            const select = document.getElementById('comm-location-select');
-            if (!select) return;
-
-            const lastSelected = localStorage.getItem('last_comm_location') || (savedLocations[0] ? formatLocationDisplay(savedLocations[0]) : '');
-
-            select.innerHTML = savedLocations.map(loc => {
-                const formattedName = formatLocationDisplay(loc);
-                return `<option value="${formattedName}" ${formattedName === lastSelected ? 'selected' : ''}>${formattedName}</option>`;
-            }).join('');
-        }
-
-        function postCommunityReport() {
-            const selectElem = document.getElementById('comm-location-select');
-            const locationName = selectElem.value;
-            const shindo = document.getElementById('comm-shindo').value;
-            const floor = document.getElementById('comm-floor').value;
-            const comment = document.getElementById('comm-comment').value.trim();
-
-            if (!locationName) {
-                alert('投稿する地点を選択してください。「地点」タブから追加できます。');
-                return;
-            }
-            if (!floor || isNaN(floor) || floor < 1 || floor > 100) {
-                alert('階数は1〜100の間で入力してください。');
-                return;
-            }
-            if (comment.length > 15) {
-                alert('揺れのコメントは15文字以内で入力してください。');
-                return;
-            }
-
-            localStorage.setItem('last_comm_location', locationName);
-
-            const newPost = {
-                id: Date.now(),
-                city: locationName,
-                shindo,
-                floor,
-                comment: comment || '特になし',
-                timestamp: Date.now()
-            };
-
-            communityPosts.unshift(newPost);
-            saveAndRenderCommunity();
-
-            document.getElementById('comm-floor').value = '';
-            document.getElementById('comm-comment').value = '';
-            alert('体感レポートを投稿しました（12時間後に自動消去されます）。');
-        }
-
-        function cleanAndRenderCommunityPosts() {
-            const now = Date.now();
-            const twelveHoursMs = 12 * 60 * 60 * 1000;
-            const validPosts = communityPosts.filter(p => (now - p.timestamp) < twelveHoursMs);
-            if (validPosts.length !== communityPosts.length) {
-                communityPosts = validPosts;
-                saveAndRenderCommunity();
-            } else {
-                renderCommunityPosts();
-            }
-        }
-
-        function saveAndRenderCommunity() {
-            localStorage.setItem('community_posts', JSON.stringify(communityPosts));
-            renderCommunityPosts();
-        }
-
-        function renderCommunityPosts() {
-            const container = document.getElementById('community-posts-list');
-            document.getElementById('comm-count').innerText = `${communityPosts.length}件`;
-
-            if (communityPosts.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-500 py-6 text-xs">現在、投稿された体感レポートはありません。</div>';
-                return;
-            }
-
-            container.innerHTML = communityPosts.map(p => {
-                const postDate = new Date(p.timestamp);
-                const timeStr = `${String(postDate.getHours()).padStart(2,'0')}:${String(postDate.getMinutes()).padStart(2,'0')}`;
-                const shindoClass = getShindoClass(p.shindo === '無感' ? '1' : p.shindo);
-
-                return `
-                    <div class="bg-gray-800 border border-gray-700/80 p-3 rounded-xl space-y-1.5 shadow-sm">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-xs text-gray-200"><i class="fa-solid fa-location-dot text-emerald-400"></i> ${p.city}</span>
-                            <span class="text-[10px] text-gray-400 font-mono"><i class="fa-regular fa-clock"></i> ${timeStr} 投稿</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="${shindoClass} px-2 py-0.5 rounded text-[11px] font-bold">体感: ${p.shindo}</span>
-                            <span class="text-[11px] text-blue-300 bg-blue-950/50 border border-blue-800/40 px-2 py-0.5 rounded">${p.floor}階</span>
-                        </div>
-                        <p class="text-xs text-gray-300 bg-gray-900/60 p-2 rounded border border-gray-800/60 font-medium">「${p.comment}」</p>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // --- 地点管理 ---
-        function updateSavedLocationMarkers() {
-            if (!locationMarkersGroup) return;
-            locationMarkersGroup.clearLayers();
-
-            const crossIcon = L.divIcon({
-                className: 'my-location-cross-marker',
-                html: '<i class="fa-solid fa-plus"></i>',
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-            });
-
-            savedLocations.forEach(loc => {
-                if (loc.lat && loc.lng) {
-                    const formattedTitle = formatLocationDisplay(loc);
-                    const marker = L.marker([loc.lat, loc.lng], { icon: crossIcon }).addTo(locationMarkersGroup);
-                    marker.bindPopup(`
-                        <div class="p-1">
-                            <div class="font-bold text-sm text-red-400 flex items-center gap-1">
-                                <i class="fa-solid fa-location-dot"></i> ${formattedTitle}
-                            </div>
-                            <div class="text-xs text-gray-300 font-mono mt-1">
-                                緯度: ${loc.lat.toFixed(4)} / 経度: ${loc.lng.toFixed(4)}
-                            </div>
-                        </div>
-                    `);
-                }
-            });
-        }
-
-        function renderSavedLocations() {
-            const container = document.getElementById('saved-locations-list');
-            if (savedLocations.length === 0) {
-                container.innerHTML = '<p class="text-xs text-gray-500">登録された地点はありません。</p>';
-                return;
-            }
-
-            container.innerHTML = savedLocations.map((loc, idx) => {
-                const formattedTitle = formatLocationDisplay(loc);
-                return `
-                    <div class="bg-gray-800 p-2.5 rounded-lg border border-gray-700 flex justify-between items-center text-xs">
-                        <div>
-                            <div class="font-bold text-gray-200 flex items-center gap-1.5">
-                                <span class="text-red-400 font-bold">＋</span> ${formattedTitle}
-                            </div>
-                            <div class="text-[10px] text-gray-400 font-mono">緯度: ${loc.lat.toFixed(4)}, 経度: ${loc.lng.toFixed(4)}</div>
-                        </div>
-                        <button onclick="removeSavedLocation(${idx})" class="text-gray-500 hover:text-red-400 p-1">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        function addSavedLocation() {
-            const customName = document.getElementById('loc-custom-name').value.trim();
-            const pref = document.getElementById('loc-pref').value.trim();
-            const city = document.getElementById('loc-city').value.trim();
-            const hideCity = document.getElementById('loc-hide-city').checked;
-            const lat = parseFloat(document.getElementById('loc-lat').value);
-            const lng = parseFloat(document.getElementById('loc-lng').value);
-
-            if (!customName || !pref || isNaN(lat) || isNaN(lng)) {
-                alert('地点の名前、県、緯度・経度を正しく入力してください。');
-                return;
-            }
-
-            savedLocations.push({ customName, pref, city, hideCity, lat, lng });
-            localStorage.setItem('saved_locations', JSON.stringify(savedLocations));
-
-            // 入力欄クリア
-            document.getElementById('loc-custom-name').value = '';
-            document.getElementById('loc-pref').value = '';
-            document.getElementById('loc-city').value = '';
-            document.getElementById('loc-hide-city').checked = false;
-            document.getElementById('loc-lat').value = '';
-            document.getElementById('loc-lng').value = '';
-            
-            renderSavedLocations();
-            updateSavedLocationMarkers();
-            updateCommunityLocationDropdown();
-        }
-
-        function removeSavedLocation(index) {
-            savedLocations.splice(index, 1);
-            localStorage.setItem('saved_locations', JSON.stringify(savedLocations));
-            
-            renderSavedLocations();
-            updateSavedLocationMarkers();
-            updateCommunityLocationDropdown();
-        }
-
-        function getCurrentGPSLocation() {
-            if (!navigator.geolocation) {
-                alert('お使いのブラウザは位置情報をサポートしていません。');
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(pos => {
-                document.getElementById('loc-lat').value = pos.coords.latitude.toFixed(4);
-                document.getElementById('loc-lng').value = pos.coords.longitude.toFixed(4);
-                if (!document.getElementById('loc-custom-name').value) {
-                    document.getElementById('loc-custom-name').value = '自宅';
-                }
-            }, () => {
-                alert('位置情報の取得に失敗しました。');
-            });
-        }
-
-        function renderEarthquakeList() {
-            const container = document.getElementById('earthquake-list');
-            const filterShindo = document.getElementById('filter-shindo').value;
-
-            const filtered = earthquakesData.filter(q => {
-                if (filterShindo === 'all') return true;
-                if (filterShindo === '4') return ['4', '5弱', '5強', '6弱', '6強', '7'].includes(q.shindo);
-                if (filterShindo === '5-') return ['5弱', '5強', '6弱', '6強', '7'].includes(q.shindo);
-                if (filterShindo === '6-') return ['6弱', '6強', '7'].includes(q.shindo);
-                return true;
-            });
-
-            document.getElementById('quake-count').innerText = filtered.length;
-
-            if (filtered.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-500 py-8 text-xs">該当する地震情報はありません</div>';
-                return;
-            }
-
-            container.innerHTML = filtered.map(q => `
-                <div onclick="selectQuake('${q.id}')" class="bg-gray-800 hover:bg-gray-750 border border-gray-700/70 hover:border-blue-500/50 p-3 rounded-xl cursor-pointer transition shadow-sm space-y-2">
-                    <div class="flex justify-between items-start gap-2">
-                        <span class="${getShindoClass(q.shindo)} px-2 py-0.5 rounded text-xs font-bold shrink-0">
-                            ${q.shindo === '情報なし' ? '震度情報なし' : '最大震度 ' + q.shindo}
-                        </span>
-                        <span class="text-[11px] text-gray-400 font-mono">${q.time}</span>
-                    </div>
-                    <div class="font-bold text-sm text-gray-100">${q.place}</div>
-                    <div class="flex justify-between items-center text-xs text-gray-400 pt-1 border-t border-gray-700/50">
-                        <span>${q.mag} / 深さ: <strong class="text-blue-300">${q.depth}</strong></span>
-                        <span class="text-blue-400 font-semibold text-[11px]">詳細 <i class="fa-solid fa-chevron-right text-[9px]"></i></span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function updateMapMarkers() {
-            quakeMarkersGroup.clearLayers();
-
-            earthquakesData.forEach(q => {
-                if (q.lat === null || q.lng === null) return;
-
-                const color = getShindoColor(q.shindo);
-                const displayLabel = q.shindo === '情報なし' ? '?' : q.shindo;
-
-                const customIcon = L.divIcon({
-                    className: 'custom-pulse-marker',
-                    html: `
-                        <div class="pulse-ring" style="background-color: ${color}; width: 32px; height: 32px;"></div>
-                        <div style="background-color: ${color};" class="w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-[10px] font-bold text-white z-10">
-                            ${displayLabel}
-                        </div>
-                    `,
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 16]
-                });
-
-                const marker = L.marker([q.lat, q.lng], { icon: customIcon }).addTo(quakeMarkersGroup);
-
-                marker.bindPopup(`
-                    <div class="p-1 space-y-1.5">
-                        <div class="font-bold text-sm text-white">${q.place}</div>
-                        <div class="text-xs text-gray-300">最大震度: <span class="font-bold text-yellow-400">${q.shindo}</span></div>
-                        <div class="text-xs text-gray-300">規模: ${q.mag} / 深さ: <span class="font-bold text-blue-300">${q.depth}</span></div>
-                        <div class="text-[11px] text-gray-400">${q.time}</div>
-                        <button onclick="openModal('${q.id}')" class="mt-2 w-full bg-blue-600 hover:bg-blue-500 text-white text-xs py-1.5 rounded font-bold transition">
-                            詳細情報と距離を表示
-                        </button>
-                    </div>
-                `);
-            });
-        }
-
-        function selectQuake(id) {
-            const q = earthquakesData.find(item => item.id === id);
-            if (!q) return;
-            map.flyTo([q.lat, q.lng], 7, { duration: 1.2 });
-            openModal(id);
-        }
-
-        function openModal(id) {
-            const q = earthquakesData.find(item => item.id === id);
-            if (!q) return;
-
-            document.getElementById('modal-title').innerText = q.place;
-            document.getElementById('modal-time').innerText = q.time;
-            document.getElementById('modal-mag').innerText = q.mag;
-            document.getElementById('modal-depth').innerText = q.depth;
-            document.getElementById('modal-tsunami-text').innerText = q.tsunamiText;
-
-            const badge = document.getElementById('modal-shindo-badge');
-            badge.innerText = q.shindo === '情報なし' ? '震度情報なし' : `最大震度 ${q.shindo}`;
-            badge.className = `px-2.5 py-1 rounded text-xs font-bold ${getShindoClass(q.shindo)}`;
-
-            const distSection = document.getElementById('modal-distance-section');
-            const distList = document.getElementById('modal-distance-list');
-
-            if (savedLocations.length > 0 && q.lat !== null && q.lng !== null) {
-                distSection.classList.remove('hidden');
-                distList.innerHTML = savedLocations.map(loc => {
-                    const dist = calculateDistance(loc.lat, loc.lng, q.lat, q.lng);
-                    const formattedTitle = formatLocationDisplay(loc);
-                    return `
-                        <div class="flex justify-between items-center text-xs">
-                            <span class="text-gray-300"><i class="fa-solid fa-plus text-red-400 font-bold"></i> ${formattedTitle}</span>
-                            <span class="font-mono text-blue-300 font-bold">約 ${dist.toFixed(1)} km</span>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                distSection.classList.add('hidden');
-            }
-
-            document.getElementById('quake-modal').classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('quake-modal').classList.add('hidden');
-        }
-
-        function toggleAudio() {
-            audioEnabled = !audioEnabled;
-            const icon = document.getElementById('audio-icon');
-            const text = document.getElementById('audio-text');
-            if (audioEnabled) {
-                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                icon.className = "fa-solid fa-volume-high text-emerald-400";
-                text.innerText = "警報音: ON";
-                playAlertTone(440, 0.1);
-            } else {
-                icon.className = "fa-solid fa-volume-xmark text-red-400";
-                text.innerText = "警報音: OFF";
-            }
-        }
-
-        function playAlertTone(freq = 880, duration = 0.5) {
-            if (!audioEnabled || !audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
-            osc.stop(audioCtx.currentTime + duration);
-        }
-
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        function getShindoClass(shindo) {
-            if (shindo === '7') return 'shindo-7';
-            if (shindo === '6強') return 'shindo-6upper';
-            if (shindo === '6弱') return 'shindo-6lower';
-            if (shindo === '5強') return 'shindo-5upper';
-            if (shindo === '5弱') return 'shindo-5lower';
-            if (shindo === '4') return 'shindo-4';
-            if (shindo === '3') return 'shindo-3';
-            if (shindo === '2') return 'shindo-2';
-            if (shindo === '1') return 'shindo-1';
-            return 'shindo-unknown';
-        }
-
-        function getShindoColor(shindo) {
-            if (shindo === '7') return '#b91c1c';
-            if (shindo.includes('6')) return '#c2410c';
-            if (shindo.includes('5')) return '#ea580c';
-            if (shindo === '4') return '#ca8a04';
-            if (shindo === '3') return '#2563eb';
-            if (shindo === '2') return '#0284c7';
-            if (shindo === '1') return '#475569';
-            return '#6b7280';
-        }
-
-        function formatJMADate(str) {
-            if (!str) return '日時不明';
-            const d = new Date(str);
-            if (isNaN(d.getTime())) return str;
-            return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-        }
-
-        function switchTab(tab) {
-            ['quake', 'community', 'tsunami', 'locations'].forEach(t => {
-                const btn = document.getElementById(`tab-btn-${t}`);
-                const content = document.getElementById(`tab-content-${t}`);
-                if (t === tab) {
-                    btn.classList.add('text-blue-400', 'border-blue-500', 'bg-gray-900');
-                    btn.classList.remove('border-transparent');
-                    content.classList.remove('hidden');
-                } else {
-                    btn.classList.remove('text-blue-400', 'border-blue-500', 'bg-gray-900');
-                    btn.classList.add('border-transparent');
-                    content.classList.add('hidden');
-                }
-            });
-        }
-
-        function applyFilters() {
-            fetchData();
-        }
-    </script>
+        const now = audioContext.currentTime;
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        // Soft bell-like frequency sequence
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.3); // E5
+        osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.6); // G5
+
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+
+        osc.start(now);
+        osc.stop(now + 1.5);
+      } catch (e) {
+        console.warn('Audio tone could not be played:', e);
+      }
+    }
+  </script>
 </body>
 </html>
